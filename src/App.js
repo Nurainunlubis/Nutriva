@@ -25,6 +25,9 @@ function App() {
   }, []);
 
   const [isModalOpen, setIsModalOpen] = useState(false); 
+  const [showCamera, setShowCamera] = useState(false);
+  const videoRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [capturedFile, setCapturedFile] = useState(null);
@@ -70,9 +73,62 @@ function App() {
     } catch (err) {
       alert("Terjadi kesalahan saat mengirim gambar.");
       console.error(err);
+
+      setSelectedFile(null);
+      setPreview(null);
+      setResults(null);
     } finally {
       setLoading(false);
     }
+  };
+
+  const openLaptopCamera = async () => {
+    setShowCamera(true);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" }
+      });
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      alert("Kamera tidak bisa diakses");
+      console.error(err);
+    }
+  };
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    if (!video || !canvas) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+
+    // mirror biar sesuai preview
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+
+      const file = new File([blob], "camera.jpg", { type: "image/jpeg" });
+
+      setSelectedFile(file);
+      setPreview(URL.createObjectURL(file));
+
+      // stop kamera
+      video.srcObject.getTracks().forEach(track => track.stop());
+
+      // tutup modal
+      setShowCamera(false);
+    }, "image/jpeg");
   };
 
   const chartData = [
@@ -125,6 +181,8 @@ function App() {
 
   const openModal = () => setIsModalOpen(true); // Open modal 
   const closeModal = () => setIsModalOpen(false); // Close modal 
+
+  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
 
   return (
     <div className="min-h-screen bg-[#f9f9f9] font-sans">
@@ -222,7 +280,7 @@ function App() {
                   <>
                     {/* Upload Button */}
                     <div className="bg-[#2f855a] text-white px-6 py-2 rounded-full font-semibold">
-                      Upload foto tabel
+                      Upload Foto dari Galeri
                     </div>
                     <span className="mt-2 text-sm text-gray-500">atau tarik ke sini</span>
                   </>
@@ -232,29 +290,37 @@ function App() {
               {/* kamera */}
               
                 <>
+                  {isMobile ? (
+                <>
                   <label
                     htmlFor="cameraInput"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm cursor-pointer self-center font-semibold"
                   >
-                    Foto dengan kamera
+                    Foto dengan Kamera
                   </label>
                   <input
                     id="cameraInput"
                     type="file"
                     accept="image/*"
                     capture="environment"
-                    style={{ display: "none" }}
+                    hidden
                     onChange={(e) => {
                       const file = e.target.files[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = () => setPreview(reader.result);
-                        reader.readAsDataURL(file);
-                        setSelectedFile(file); 
-                        setCapturedFile(file);
-                      }
+                      if (!file) return;
+                      setSelectedFile(file);
+                      setPreview(URL.createObjectURL(file));
                     }}
                   />
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={openLaptopCamera}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm self-center font-semibold"
+                >
+                  Foto dengan Kamera
+                </button>
+              )}
                 </>
               
 
@@ -574,49 +640,6 @@ function App() {
         </div>
         <section id="teknologi" className="h-1 invisible"></section>
         {/*area teknologi yg digunakan*/}
-        <section id="konten teknologi" className="w-full bg-gradient-to-l from-[#f4ecd8] to-white py-16 px-8">
-          <div className="flex flex-col lg:flex-row gap-10 max-w-7xl mx-auto">
-              {/* logo */}
-              <div className="bg-white shadow-xl rounded-2xl p-6 flex flex-col lg:flex-row items-center justify-center">
-              <div className="flex-1 flex items-center justify-center px-4 py-6 mb-4 lg:mb-0 lg:mr-4">
-                <img
-                  src="/asset/logo yolo.jpeg"
-                  alt="YOLO Logo"
-                  className="h-32 object-contain transition-transform hover:scale-110"
-                />
-              </div>
-
-              <div className="flex-1 flex items-center justify-center px-4 py-6 lg:border-l lg:border-t-0 border-t border-gray-300">
-                <img
-                  src="/asset/logo ocr.jpg"
-                  alt="EasyOCR Logo"
-                  className="h-32 object-contain transition-transform hover:scale-110"
-                />
-              </div>
-            </div>
-            {/* Title dan Text */}
-            <div className="lg:w-1/2 text-center lg:text-left flex flex-col justify-center">
-              <h2 className="text-4xl md:text-5xl font-bold leading-tight">
-                <span className="text-[#2f855a]">Teknologi</span><br />
-                <span className="text-gray-900">yang digunakan.</span>
-              </h2>
-              <p className="mt-4 text-gray-600 text-lg">
-                <strong>YOLOv10. </strong>
-                You Only Look Once (YOLO) merupakan pre-trained model yang menghadirkan pendekatan real-time end-to-end untuk deteksi objek.
-                Dalam aplikasi ini model YOLOv10 digunakan untuk mendeteksi keberadaan tabel informasi nilai gizi yang sudah di upload, lalu juga mendeteksi
-                masing-masing nilai gizi yang ada yang selanjutnya akan di proses menggunakan easyOCR.
-              </p>
-              <p className="mt-4 text-gray-600 text-lg">
-                <strong>EasyOCR. </strong>
-                Optical Character Recognition (OCR) adalah proses mengubah teks cetak menjadi format digital yang dapat dibaca oleh komputer,
-                OCR menganalisis gambar untuk mengidentifikasikan karakter, kata, ataupun blok teks satu per satu. Dalam aplikasi ini, easyOCR digunakan
-                untuk melakukan ekstraksi data gizi yang sudah di deteksi sebelumnya, hasil ekstraksi nantinya akan diterapkan aturan untuk mengambil hanya bagian
-                nilai gizinya saja, sehingga data dapat di proses ke tahap selanjutnya yaitu visualisasi.
-              </p>
-            </div>
-          </div>
-        </section>
-        <section id="referensi" className="h-1 invisible"></section>
 
         {/*area referensi*/}
         <section id="konten referensi" className="w-full bg-gradient-to-r from-[#f4ecd8] to-white py-16 px-8">
@@ -655,6 +678,41 @@ function App() {
         </section>
       </main>
       </section>
+      {/* ===== MODAL KAMERA LAPTOP ===== */}
+        {showCamera && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-xl">
+              <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          className="w-80 rounded-md"
+          style={{ transform: "scaleX(-1)" }}
+          />
+            <canvas ref={canvasRef} hidden />
+
+            <div className="flex justify-center gap-4 mt-4">
+              <button
+                onClick={capturePhoto}
+                className="bg-green-600 text-white px-4 py-2 rounded"
+              >
+                Ambil Foto
+              </button>
+              <button
+                onClick={() => {
+                  videoRef.current?.srcObject
+                    ?.getTracks()
+                    .forEach(t => t.stop());
+                  setShowCamera(false);
+                }}
+                className="bg-gray-400 px-4 py-2 rounded"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <footer className="w-full flex flex-col items-center justify-center px-12 py-6 bg-[#2f855a] shadow-inner mt-10">
         <img
           src="/asset/Nutri.png"
